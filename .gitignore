@@ -271,3 +271,4 @@ git check-ignore -v backend/node_modules/@redis/client/dist/lib/client/cache.js
 ```
 
 Then we'll safely create the first commit and move to the actual **Git → Jenkins → Kubernetes → TTM measurement pipeline**.
+frontend/catalog-sources/*.parquet
