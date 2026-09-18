@@ -1,0 +1,273 @@
+# ==========================================
+
+# ShopKartX - Git Ignore
+
+# ==========================================
+
+# ------------------------------------------
+
+# Dependencies
+
+# ------------------------------------------
+
+node_modules/
+**/node_modules/
+
+# ------------------------------------------
+
+# Environment / Secrets
+
+# ------------------------------------------
+
+.env
+.env.*
+!.env.example
+
+# ------------------------------------------
+
+# Logs
+
+# ------------------------------------------
+
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# ------------------------------------------
+
+# Build / Distribution
+
+# ------------------------------------------
+
+dist/
+build/
+coverage/
+.vite/
+.cache/
+.tmp/
+temp/
+
+# ------------------------------------------
+
+# Runtime / PID files
+
+# ------------------------------------------
+
+*.pid
+*.seed
+
+# ------------------------------------------
+
+# OS generated files
+
+# ------------------------------------------
+
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# ------------------------------------------
+
+# Editor / IDE
+
+# ------------------------------------------
+
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ------------------------------------------
+
+# Local database files
+
+# ------------------------------------------
+
+*.sqlite
+*.sqlite3
+*.db
+
+# ------------------------------------------
+
+# Test / Coverage
+
+# ------------------------------------------
+
+.nyc_output/
+coverage/
+
+# ------------------------------------------
+
+# Docker local files
+
+# ------------------------------------------
+
+docker-data/
+docker-volumes/
+
+# ------------------------------------------
+
+# Kubernetes local files
+
+# ------------------------------------------
+
+*.kubeconfig
+.kube/
+kind-config.local.yaml
+
+# ------------------------------------------
+
+# Terraform local/state files
+
+# ------------------------------------------
+
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# ------------------------------------------
+
+# Generated backups
+
+# ------------------------------------------
+
+*.backup
+*.bak
+*.tmp
+
+# ------------------------------------------
+
+# Local admin backups
+
+# ------------------------------------------
+
+admin-panel-backup-*/
+
+# ------------------------------------------
+
+# Python cache (if used later)
+
+# ------------------------------------------
+
+**pycache**/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# ------------------------------------------
+
+# Secrets / certificates
+
+# ------------------------------------------
+
+*.pem
+*.key
+*.crt
+*.p12
+
+# ------------------------------------------
+
+# Local IDE / tooling
+
+# ------------------------------------------
+
+.history/
+.fleet/
+
+````
+
+Save:
+
+```text
+CTRL + O
+ENTER
+CTRL + X
+````
+
+### Step 2 — Important: remove already-staged `node_modules`
+
+Because you already ran `git add .`, `.gitignore` **alone won't remove files that are already staged**.
+
+Run:
+
+```bash
+cd ~/shopkartx
+
+git reset
+```
+
+Then:
+
+```bash
+git status
+```
+
+Now `node_modules` should **NOT** appear.
+
+### Step 3 — Verify ignore
+
+Run:
+
+```bash
+git check-ignore -v backend/node_modules/@redis/client/dist/lib/client/cache.js
+```
+
+You should get something similar to:
+
+```text
+.gitignore:...:**/node_modules/    backend/node_modules/...
+```
+
+Then:
+
+```bash
+git status --short
+```
+
+### Expected result
+
+You should see project files such as:
+
+```text
+?? .gitignore
+?? Jenkinsfile
+?? README.md
+?? admin-panel/
+?? backend/
+?? database/
+?? docker-compose.yml
+?? frontend/
+```
+
+But **you should NOT see**:
+
+```text
+backend/node_modules/
+frontend/node_modules/
+```
+
+Don't run `git add .` again yet.
+
+**Paste the output of these two commands:**
+
+```bash
+git status --short
+```
+
+and
+
+```bash
+git check-ignore -v backend/node_modules/@redis/client/dist/lib/client/cache.js
+```
+
+Then we'll safely create the first commit and move to the actual **Git → Jenkins → Kubernetes → TTM measurement pipeline**.
