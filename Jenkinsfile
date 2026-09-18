@@ -1,9 +1,10 @@
+```groovy
 pipeline {
     agent any
 
     environment {
-        TTM_URL = 'http://host.docker.internal:9105'
-        TTM_DEPLOYMENT_ID = "${env.BUILD_TAG}"
+        TTM_URL = 'http://shopkartx-ttm:9105'
+        TTM_DEPLOYMENT_ID = "${env.JOB_NAME}-${env.BUILD_NUMBER}"
     }
 
     stages {
@@ -29,7 +30,7 @@ pipeline {
             }
         }
 
-        stage('Build Start') {
+        stage('Build Started') {
             steps {
                 script {
                     sh '''
@@ -56,7 +57,7 @@ pipeline {
             }
         }
 
-        stage('Build Complete') {
+        stage('Build Completed') {
             steps {
                 script {
                     sh '''
@@ -74,19 +75,18 @@ pipeline {
             }
         }
 
-        stage('Production Ready') {
+        stage('CI Validation') {
             steps {
                 script {
                     sh '''
-                        curl -sS -X POST "$TTM_URL/events" \
-                          -H "Content-Type: application/json" \
-                          -d "{
-                            \\"deployment_id\\": \\"$TTM_DEPLOYMENT_ID\\",
-                            \\"commit_sha\\": \\"$COMMIT_SHA\\",
-                            \\"commit_time\\": \\"$COMMIT_TIME\\",
-                            \\"event\\": \\"production_ready_time\\",
-                            \\"event_time\\": \\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\\"
-                          }"
+                        echo "===== ShopKartX CI Validation ====="
+                        echo "Repository: ShopKartX"
+                        echo "Commit: $COMMIT_SHA"
+                        echo "Commit Time: $COMMIT_TIME"
+                        echo "Build: $BUILD_NUMBER"
+                        echo
+                        echo "Production Ready event is intentionally NOT recorded here."
+                        echo "It must come from actual Kubernetes/Argo CD readiness."
                     '''
                 }
             }
@@ -101,5 +101,15 @@ pipeline {
         failure {
             echo 'ShopKartX CI pipeline failed.'
         }
+
+        always {
+            script {
+                sh '''
+                    echo "===== TTM RECORD ====="
+                    curl -sS "$TTM_URL/deployments/$TTM_DEPLOYMENT_ID" || true
+                '''
+            }
+        }
     }
 }
+```
