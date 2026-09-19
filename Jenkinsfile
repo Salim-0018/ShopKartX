@@ -9,7 +9,7 @@ pipeline {
         TTM_PORT = '9105'
         TTM_DEPLOYMENT_ID = "${env.JOB_NAME}-${env.BUILD_NUMBER}"
 
-        DOCKERHUB_CREDENTIALS = 'paul48'
+        DOCKERHUB_CREDENTIALS = 'dockerhub'
         GITHUB_CREDENTIALS = 'github-shopkartx'
 
         FRONTEND_IMAGE = 'paul48/shopkartx-frontend'
