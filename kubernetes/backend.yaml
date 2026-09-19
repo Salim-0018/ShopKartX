@@ -17,8 +17,8 @@ spec:
     spec:
       containers:
         - name: backend
-          image: shopkartx-backend:local
-          imagePullPolicy: IfNotPresent
+          image: paul48/shopkartx-backend:build-13
+          imagePullPolicy: Always
           ports:
             - containerPort: 5001
               name: http
