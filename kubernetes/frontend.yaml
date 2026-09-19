@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: paul48/shopkartx-frontend:build-17
+          image: paul48/shopkartx-frontend:build-18
           imagePullPolicy: Always
           ports:
             - containerPort: 80
