@@ -1,12 +1,14 @@
+```groovy
 pipeline {
     agent any
 
     environment {
-        TTM_URL = 'http://shopkartx-ttm:9105'
-        TTM_DEPLOYMENT_ID = "${env.JOB_NAME}-${env.BUILD_NUMBER}"
         KUBE_CONFIG = '/var/jenkins_home/kube-ci/config'
         KUBE_NAMESPACE = 'shopkartx'
+        TTM_DEPLOYMENT = 'deployment/shopkartx-ttm'
         ARGO_APP = 'shopkartx'
+        TTM_PORT = '9105'
+        TTM_DEPLOYMENT_ID = "${env.JOB_NAME}-${env.BUILD_NUMBER}"
     }
 
     stages {
@@ -32,23 +34,50 @@ pipeline {
             }
         }
 
-        stage('Build Started') {
+        stage('Verify Kubernetes Access') {
+            steps {
+                sh '''
+                    set -e
+
+                    echo "===== KUBERNETES ACCESS ====="
+
+                    kubectl --kubeconfig="$KUBE_CONFIG" get nodes
+
+                    echo
+                    kubectl --kubeconfig="$KUBE_CONFIG" \
+                      get pods -n "$KUBE_NAMESPACE"
+
+                    echo
+                    echo "Kubernetes access verified."
+                '''
+            }
+        }
+
+        stage('TTM Build Started') {
             steps {
                 sh '''
                     set -e
 
                     echo "===== TTM: BUILD STARTED ====="
 
-                    curl -fsS -X POST "$TTM_URL/events" \
-                      -H "Content-Type: application/json" \
-                      -d "{
-                        \\"deploymentId\\": \\"$TTM_DEPLOYMENT_ID\\",
-                        \\"commitSha\\": \\"$COMMIT_SHA\\",
-                        \\"commitTime\\": \\"$COMMIT_TIME\\",
-                        \\"event\\": \\"build_started\\",
-                        \\"timestamp\\": \\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\\",
-                        \\"source\\": \\"jenkins\\"
-                      }"
+                    TTM_PAYLOAD=$(cat <<EOF
+{
+  "deploymentId": "$TTM_DEPLOYMENT_ID",
+  "commitSha": "$COMMIT_SHA",
+  "commitTime": "$COMMIT_TIME",
+  "event": "build_started",
+  "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "source": "jenkins"
+}
+EOF
+)
+
+                    kubectl --kubeconfig="$KUBE_CONFIG" \
+                      exec -n "$KUBE_NAMESPACE" "$TTM_DEPLOYMENT" -- \
+                      wget -qO- \
+                      --header="Content-Type: application/json" \
+                      --post-data="$TTM_PAYLOAD" \
+                      "http://127.0.0.1:$TTM_PORT/events"
 
                     echo
                     echo "TTM build_started recorded."
@@ -123,46 +152,34 @@ pipeline {
             }
         }
 
-        stage('Build Completed') {
+        stage('TTM Build Completed') {
             steps {
                 sh '''
                     set -e
 
                     echo "===== TTM: BUILD COMPLETED ====="
 
-                    curl -fsS -X POST "$TTM_URL/events" \
-                      -H "Content-Type: application/json" \
-                      -d "{
-                        \\"deploymentId\\": \\"$TTM_DEPLOYMENT_ID\\",
-                        \\"commitSha\\": \\"$COMMIT_SHA\\",
-                        \\"commitTime\\": \\"$COMMIT_TIME\\",
-                        \\"event\\": \\"build_completed\\",
-                        \\"timestamp\\": \\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\\",
-                        \\"source\\": \\"jenkins\\"
-                      }"
+                    TTM_PAYLOAD=$(cat <<EOF
+{
+  "deploymentId": "$TTM_DEPLOYMENT_ID",
+  "commitSha": "$COMMIT_SHA",
+  "commitTime": "$COMMIT_TIME",
+  "event": "build_completed",
+  "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "source": "jenkins"
+}
+EOF
+)
+
+                    kubectl --kubeconfig="$KUBE_CONFIG" \
+                      exec -n "$KUBE_NAMESPACE" "$TTM_DEPLOYMENT" -- \
+                      wget -qO- \
+                      --header="Content-Type: application/json" \
+                      --post-data="$TTM_PAYLOAD" \
+                      "http://127.0.0.1:$TTM_PORT/events"
 
                     echo
                     echo "TTM build_completed recorded."
-                '''
-            }
-        }
-
-        stage('Verify Kubernetes Access') {
-            steps {
-                sh '''
-                    set -e
-
-                    echo "===== KUBERNETES ACCESS ====="
-
-                    kubectl --kubeconfig="$KUBE_CONFIG" \
-                      get nodes
-
-                    echo
-                    kubectl --kubeconfig="$KUBE_CONFIG" \
-                      get pods -n "$KUBE_NAMESPACE"
-
-                    echo
-                    echo "Kubernetes access verified."
                 '''
             }
         }
@@ -174,12 +191,33 @@ pipeline {
 
                     echo "===== ARGO CD STATUS ====="
 
-                    kubectl --kubeconfig="$KUBE_CONFIG" \
+                    SYNC_STATUS=$(kubectl \
+                      --kubeconfig="$KUBE_CONFIG" \
                       get application "$ARGO_APP" \
                       -n argocd \
-                      -o jsonpath='SYNC={.status.sync.status} HEALTH={.status.health.status}'
+                      -o jsonpath='{.status.sync.status}')
+
+                    HEALTH_STATUS=$(kubectl \
+                      --kubeconfig="$KUBE_CONFIG" \
+                      get application "$ARGO_APP" \
+                      -n argocd \
+                      -o jsonpath='{.status.health.status}')
+
+                    echo "Argo CD Sync: $SYNC_STATUS"
+                    echo "Argo CD Health: $HEALTH_STATUS"
+
+                    if [ "$SYNC_STATUS" != "Synced" ]; then
+                        echo "Argo CD is not Synced."
+                        exit 1
+                    fi
+
+                    if [ "$HEALTH_STATUS" != "Healthy" ]; then
+                        echo "Argo CD is not Healthy."
+                        exit 1
+                    fi
 
                     echo
+                    echo "Argo CD verification passed."
                 '''
             }
         }
@@ -208,19 +246,16 @@ pipeline {
                           -n argocd \
                           -o jsonpath='{.status.health.status}')
 
+                        echo
                         echo "Attempt $ATTEMPT/$MAX_ATTEMPTS"
                         echo "Argo CD Sync: $SYNC_STATUS"
                         echo "Argo CD Health: $HEALTH_STATUS"
 
-                        POD_STATUS=$(kubectl \
-                          --kubeconfig="$KUBE_CONFIG" \
-                          get pods \
-                          -n "$KUBE_NAMESPACE" \
-                          -o jsonpath='{range .items[*]}{.metadata.name}={.status.phase}{"\\n"}{end}')
-
                         echo
-                        echo "Pods:"
-                        echo "$POD_STATUS"
+                        echo "===== POD STATUS ====="
+
+                        kubectl --kubeconfig="$KUBE_CONFIG" \
+                          get pods -n "$KUBE_NAMESPACE" -o wide
 
                         NOT_READY=$(kubectl \
                           --kubeconfig="$KUBE_CONFIG" \
@@ -262,23 +297,31 @@ pipeline {
             }
         }
 
-        stage('Production Ready') {
+        stage('TTM Production Ready') {
             steps {
                 sh '''
                     set -e
 
                     echo "===== TTM: PRODUCTION READY ====="
 
-                    curl -fsS -X POST "$TTM_URL/events" \
-                      -H "Content-Type: application/json" \
-                      -d "{
-                        \\"deploymentId\\": \\"$TTM_DEPLOYMENT_ID\\",
-                        \\"commitSha\\": \\"$COMMIT_SHA\\",
-                        \\"commitTime\\": \\"$COMMIT_TIME\\",
-                        \\"event\\": \\"production_ready\\",
-                        \\"timestamp\\": \\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\\",
-                        \\"source\\": \\"jenkins-kubernetes-readiness\\"
-                      }"
+                    TTM_PAYLOAD=$(cat <<EOF
+{
+  "deploymentId": "$TTM_DEPLOYMENT_ID",
+  "commitSha": "$COMMIT_SHA",
+  "commitTime": "$COMMIT_TIME",
+  "event": "production_ready",
+  "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "source": "jenkins-kubernetes-readiness"
+}
+EOF
+)
+
+                    kubectl --kubeconfig="$KUBE_CONFIG" \
+                      exec -n "$KUBE_NAMESPACE" "$TTM_DEPLOYMENT" -- \
+                      wget -qO- \
+                      --header="Content-Type: application/json" \
+                      --post-data="$TTM_PAYLOAD" \
+                      "http://127.0.0.1:$TTM_PORT/events"
 
                     echo
                     echo "Production Ready event recorded."
@@ -293,8 +336,10 @@ pipeline {
 
                     echo "===== FINAL TTM REPORT ====="
 
-                    curl -fsS \
-                      "$TTM_URL/deployments/$TTM_DEPLOYMENT_ID"
+                    kubectl --kubeconfig="$KUBE_CONFIG" \
+                      exec -n "$KUBE_NAMESPACE" "$TTM_DEPLOYMENT" -- \
+                      wget -qO- \
+                      "http://127.0.0.1:$TTM_PORT/deployments/$TTM_DEPLOYMENT_ID"
 
                     echo
                 '''
@@ -335,9 +380,10 @@ unless Kubernetes readiness was confirmed.
                     echo
                     echo "===== PIPELINE TTM RECORD ====="
 
-                    curl -sS \
-                      --max-time 10 \
-                      "$TTM_URL/deployments/$TTM_DEPLOYMENT_ID" \
+                    kubectl --kubeconfig="$KUBE_CONFIG" \
+                      exec -n "$KUBE_NAMESPACE" "$TTM_DEPLOYMENT" -- \
+                      wget -qO- \
+                      "http://127.0.0.1:$TTM_PORT/deployments/$TTM_DEPLOYMENT_ID" \
                       || true
 
                     echo
@@ -346,3 +392,4 @@ unless Kubernetes readiness was confirmed.
         }
     }
 }
+```
