@@ -1,0 +1,63 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shopkartx-ttm
+  namespace: shopkartx
+  labels:
+    app: shopkartx-ttm
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: shopkartx-ttm
+  template:
+    metadata:
+      labels:
+        app: shopkartx-ttm
+    spec:
+      containers:
+        - name: ttm
+          image: shopkartx-ttm:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 9105
+              protocol: TCP
+          env:
+            - name: PORT
+              value: "9105"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 9105
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 9105
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: shopkartx-ttm
+  namespace: shopkartx
+  labels:
+    app: shopkartx-ttm
+spec:
+  type: ClusterIP
+  selector:
+    app: shopkartx-ttm
+  ports:
+    - name: http
+      port: 9105
+      targetPort: 9105
+      protocol: TCP
