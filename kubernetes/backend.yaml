@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: backend
-          image: paul48/shopkartx-backend:build-13
+          image: paul48/shopkartx-backend:build-17
           imagePullPolicy: Always
           ports:
             - containerPort: 5001
