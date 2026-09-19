@@ -1,4 +1,3 @@
-```groovy
 pipeline {
     agent any
 
@@ -392,4 +391,3 @@ unless Kubernetes readiness was confirmed.
         }
     }
 }
-```
