@@ -273,12 +273,47 @@ EOF_PAYLOAD
                           -m "chore: deploy ShopKartX build ${BUILD_NUMBER}"
 
                         echo
+                        echo "===== FETCHING LATEST GITHUB MAIN ====="
+
+                        git fetch origin main
+
+                        echo
+                        echo "===== SYNCHRONIZING WITH GITHUB MAIN ====="
+
+                        git rebase origin/main
+
+                        echo
+                        echo "===== GIT STATUS AFTER REBASE ====="
+
+                        git status --short
+
+                        echo
+                        echo "===== LOCAL COMMITS TO PUSH ====="
+
+                        git log --oneline origin/main..HEAD
+
+                        echo
                         echo "===== PUSHING GITOPS CHANGE TO GITHUB ====="
 
-                        git remote set-url origin \
-                          "https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/Salim-0018/ShopKartX.git"
+                        GIT_ASKPASS_SCRIPT="$WORKSPACE/.git-askpass.sh"
+
+                        cat > "$GIT_ASKPASS_SCRIPT" <<'EOF_ASKPASS'
+#!/bin/sh
+case "$1" in
+    *Username*) printf '%s\\n' "$GITHUB_USERNAME" ;;
+    *Password*) printf '%s\\n' "$GITHUB_TOKEN" ;;
+    *) exit 1 ;;
+esac
+EOF_ASKPASS
+
+                        chmod 700 "$GIT_ASKPASS_SCRIPT"
+
+                        export GIT_ASKPASS="$GIT_ASKPASS_SCRIPT"
+                        export GIT_TERMINAL_PROMPT=0
 
                         git push origin HEAD:main
+
+                        rm -f "$GIT_ASKPASS_SCRIPT"
 
                         echo
                         echo "GitOps commit pushed successfully."
